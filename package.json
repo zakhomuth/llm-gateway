@@ -1,0 +1,48 @@
+{
+  "name": "@zakhomuth/llm-gateway",
+  "version": "0.1.0",
+  "description": "Configurable LLM gateway: paused/dry-run/replay modes, Anthropic/Bedrock/Ollama/OpenAI-compatible providers, response cache, spend ledger and daily USD cap.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && cp -R src/providers/fixtures dist/providers/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm rebuild better-sqlite3 && npm run typecheck && vitest run --silent && npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.992.0",
+    "@aws-sdk/client-dynamodb": "^3.992.0",
+    "@aws-sdk/lib-dynamodb": "^3.992.0",
+    "zod": "^3.25.17"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.11.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.3",
+    "typescript": "^5.9",
+    "vitest": "^3.2.7"
+  }
+}
