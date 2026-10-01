@@ -15,7 +15,17 @@ export function stableStringify(value: unknown): string {
 
 export function zodShape(schema: ZodTypeAny): unknown {
   const def = schema._def as Record<string, any>;
+  const shape = zodShapeBare(schema);
+  // .describe() text guides the model for every type, not only strings.
+  return def.description && shape && typeof shape === "object"
+    ? { ...(shape as object), description: def.description }
+    : shape;
+}
+
+function zodShapeBare(schema: ZodTypeAny): unknown {
+  const def = schema._def as Record<string, any>;
   const type = def.typeName as string;
+  const inner = (s: unknown) => zodShape(s as ZodTypeAny);
   if (type === "ZodObject") {
     const raw = typeof def.shape === "function" ? def.shape() : def.shape;
     const properties: Record<string, unknown> = {};
@@ -24,8 +34,7 @@ export function zodShape(schema: ZodTypeAny): unknown {
       raw as Record<string, ZodTypeAny>,
     )) {
       properties[key] = zodShape(child);
-      if ((child._def as Record<string, unknown>).typeName !== "ZodOptional")
-        required.push(key);
+      if (!child.isOptional()) required.push(key);
     }
     return {
       type: "object",
@@ -34,15 +43,24 @@ export function zodShape(schema: ZodTypeAny): unknown {
       ...(required.length ? { required } : {}),
     };
   }
-  if (type === "ZodString")
+  if (type === "ZodString" || type === "ZodDate") return { type: "string" };
+  if (type === "ZodNumber")
     return {
-      type: "string",
-      ...(def.description ? { description: def.description } : {}),
+      type: (def.checks as Array<{ kind: string }> | undefined)?.some(
+        (c) => c.kind === "int",
+      )
+        ? "integer"
+        : "number",
     };
-  if (type === "ZodNumber") return { type: "number" };
+  if (type === "ZodBigInt") return { type: "integer" };
   if (type === "ZodBoolean") return { type: "boolean" };
-  if (type === "ZodArray")
-    return { type: "array", items: zodShape(def.type as ZodTypeAny) };
+  if (type === "ZodNull") return { type: "null" };
+  if (type === "ZodArray") return { type: "array", items: inner(def.type) };
+  if (type === "ZodTuple")
+    return { type: "array", items: { anyOf: (def.items as unknown[]).map(inner) } };
+  if (type === "ZodSet") return { type: "array", items: inner(def.valueType) };
+  if (type === "ZodRecord" || type === "ZodMap")
+    return { type: "object", additionalProperties: inner(def.valueType) };
   if (type === "ZodEnum") return { type: "string", enum: def.values };
   if (type === "ZodNativeEnum")
     return {
@@ -52,11 +70,29 @@ export function zodShape(schema: ZodTypeAny): unknown {
         ),
       ],
     };
-  if (type === "ZodOptional") return zodShape(def.innerType as ZodTypeAny);
+  if (type === "ZodUnion" || type === "ZodDiscriminatedUnion")
+    return {
+      anyOf: [...(def.options as Iterable<unknown>)].map(inner),
+    };
+  if (type === "ZodIntersection")
+    return { allOf: [inner(def.left), inner(def.right)] };
   if (type === "ZodNullable")
-    return { anyOf: [zodShape(def.innerType as ZodTypeAny), { type: "null" }] };
+    return { anyOf: [inner(def.innerType), { type: "null" }] };
   if (type === "ZodLiteral") return { const: def.value };
-  return { type: type.replace(/^Zod/, "").toLowerCase() };
+  // Wrappers: the JSON shape is the wrapped schema's.
+  if (
+    type === "ZodOptional" ||
+    type === "ZodDefault" ||
+    type === "ZodCatch" ||
+    type === "ZodReadonly" ||
+    type === "ZodBranded"
+  )
+    return inner(def.innerType ?? def.type);
+  if (type === "ZodEffects") return inner(def.schema);
+  if (type === "ZodLazy") return inner(def.getter());
+  if (type === "ZodPipeline") return inner(def.in);
+  // ZodAny / ZodUnknown and anything else: accept any JSON value.
+  return {};
 }
 
 const sha = (value: string) =>

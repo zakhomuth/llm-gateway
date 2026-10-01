@@ -1,5 +1,5 @@
 import { zodShape } from "../key.js";
-import { consoleLogger, type Logger } from "../logger.js";
+import { consoleLogger, logSafe, type Logger } from "../logger.js";
 import { resolveMessages, requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
 import type { FetchLike } from "./ollama.js";
@@ -61,7 +61,7 @@ export function createOpenAiCompatibleClient(options: {
         operation: req.operation,
         model: options.model,
         prompt: requestPrompt(req),
-        body,
+        body: logSafe(body),
       });
       try {
         const response = await fetchImpl(url, {

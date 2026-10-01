@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.2.1
+
+- Structured-output JSON schemas now cover unions (incl. discriminated), intersections, records/maps, tuples, sets,
+  defaults, refinements/transforms, pipelines, lazy, nullish, `int()`, dates and `any`/`unknown`; previously these
+  became invalid types such as `{"type":"union"}`.
+- `.describe()` text is kept on every type, not only strings.
+- Cache keys for schema requests that use these types change once.
+- Provider request logs truncate strings over 10k chars (base64 attachments) to 200 chars plus their length; prompts
+  are still logged in full.
+
 ## 0.2.0
 
 - Added PDF/document attachments through the `LlmAttachment` alias: `application/pdf` becomes a document content block for Anthropic and Bedrock, while Ollama and OpenAI-compatible providers return an explicit unsupported error.

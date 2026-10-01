@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { consoleLogger, type Logger } from "../logger.js";
+import { consoleLogger, logSafe, type Logger } from "../logger.js";
 import { requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
 import {
@@ -58,7 +58,7 @@ export function createAnthropicClient(
         operation: req.operation,
         model,
         prompt: requestPrompt(req),
-        body,
+        body: logSafe(body),
       });
       try {
         const response = await getClient().messages.create(body);

@@ -1,4 +1,4 @@
-import { consoleLogger, type Logger } from "../logger.js";
+import { consoleLogger, logSafe, type Logger } from "../logger.js";
 import { resolveMessages, requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -44,7 +44,7 @@ export function createOllamaClient(
         operation: req.operation,
         model,
         prompt: requestPrompt(req),
-        body,
+        body: logSafe(body),
       });
       try {
         const response = await fetchImpl(`${baseUrl}/api/chat`, {

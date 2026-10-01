@@ -2,7 +2,7 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
-import { consoleLogger, type Logger } from "../logger.js";
+import { consoleLogger, logSafe, type Logger } from "../logger.js";
 import { requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
 import {
@@ -40,7 +40,7 @@ export function createBedrockClient(options: {
         operation: req.operation,
         modelArn: options.modelArn,
         prompt: requestPrompt(req),
-        body,
+        body: logSafe(body),
       });
       try {
         const response = await client.send(
