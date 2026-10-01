@@ -44,6 +44,22 @@ for structured (schema) calls instead of the default forced tool choice —
 some models reject a forced tool_choice. It is folded into the cache key and
 supported by both the direct Anthropic provider and `AnthropicBatchBroker`.
 
+`images?: LlmAttachment[]` supplies image or document attachments. Attachments
+are placed before the text block of the first user message, whether the request
+uses `prompt` or `messages`. An attachment with `mediaType: "application/pdf"`
+becomes an Anthropic `document` content block in the Anthropic and Bedrock
+drivers; Ollama and OpenAI-compatible drivers throw a clear unsupported error.
+
+Structured-output `schema` values may have a non-object root, such as
+`z.array(...)`. Anthropic tool input schemas are automatically wrapped in
+`{ result: ... }` and their responses are transparently unwrapped, so
+`result.parsed` continues to validate against the original schema.
+
+`validationRetries?: number` on `LlmRequest` defaults to `0`. When schema
+validation fails, the gateway can reissue the request with the invalid response
+and a correction instruction for up to that many extra attempts. Every attempt
+is cost-recorded, and only a valid result is cached.
+
 ## Store schemas
 
 The file store writes `<root>/<key>.txt` and `<root>/<key>.json`; the sidecar contains `prompt`, `meta`, and `createdAt`.

@@ -1,3 +1,4 @@
+import type { ZodTypeAny } from "zod";
 import { zodShape } from "../key.js";
 import { resolveMessages } from "../request.js";
 import type { LlmRequest } from "../types.js";
@@ -7,13 +8,25 @@ export const AUTO_TOOL_NUDGE = "Return only the tool call and no additional text
 
 export function extractAnthropicMessageText(
   content: Array<{ type: string; text?: string; input?: unknown }>,
+  req?: LlmRequest,
 ): string {
+  const toolBlock = content.find((c) => c.type === "tool_use");
   const textBlocks = content
     .filter((c) => c.type === "text")
     .map((c) => c.text ?? "");
-  if (textBlocks.length) return textBlocks.join("");
-  const toolBlock = content.find((c) => c.type === "tool_use");
-  return toolBlock ? JSON.stringify(toolBlock.input) : "";
+  // A schema request's answer is the tool input, even if the model also wrote
+  // a text preamble (possible with autoTool).
+  if (textBlocks.length && !(req?.schema && toolBlock))
+    return textBlocks.join("");
+  if (!toolBlock) return "";
+  if (req?.schema && isWrappedSchema(req.schema))
+    return JSON.stringify((toolBlock.input as { result: unknown }).result);
+  return JSON.stringify(toolBlock.input);
+}
+
+export function isWrappedSchema(schema: ZodTypeAny): boolean {
+  const shape = zodShape(schema) as { type?: string };
+  return shape.type !== "object";
 }
 
 /**
@@ -26,10 +39,13 @@ export function buildStructuredToolParams(
   req: LlmRequest,
 ): { system?: string; tools?: unknown[]; tool_choice?: unknown } {
   if (!req.schema) return req.system ? { system: req.system } : {};
+  const shape = zodShape(req.schema);
   const tool = {
     name: STRUCTURED_TOOL_NAME,
     description: "Emit the structured result.",
-    input_schema: zodShape(req.schema),
+    input_schema: isWrappedSchema(req.schema)
+      ? { type: "object", properties: { result: shape }, required: ["result"] }
+      : shape,
   };
   if (req.autoTool) {
     return {
@@ -52,6 +68,14 @@ export type AnthropicContent =
   | {
       type: "image";
       source: { type: "base64"; media_type: string; data: string };
+    }
+  | {
+      type: "document";
+      source: {
+        type: "base64";
+        media_type: "application/pdf";
+        data: string;
+      };
     };
 export function buildAnthropicStyleMessages(
   req: LlmRequest,
@@ -60,17 +84,33 @@ export function buildAnthropicStyleMessages(
     role: m.role,
     content: [{ type: "text" as const, text: m.content }] as AnthropicContent[],
   }));
-  if (!req.messages && req.images?.length)
-    messages[0]!.content.push(
-      ...req.images.map((image) => ({
-        type: "image" as const,
-        source: {
-          type: "base64" as const,
-          media_type: image.mediaType,
-          data: image.data,
-        },
-      })),
+  if (req.images?.length) {
+    const target = req.messages
+      ? messages.find((message) => message.role === "user")
+      : messages[0];
+    target?.content.unshift(
+      ...req.images.map(
+        (image): AnthropicContent =>
+          image.mediaType === "application/pdf"
+            ? {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: image.data,
+                },
+              }
+            : {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: image.mediaType,
+                  data: image.data,
+                },
+              },
+      ),
     );
+  }
   return messages;
 }
 export function buildBedrockMessages(

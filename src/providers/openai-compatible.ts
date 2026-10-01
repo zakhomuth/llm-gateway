@@ -16,6 +16,10 @@ export function createOpenAiCompatibleClient(options: {
   return {
     provider: "openai-compatible",
     async complete(req: LlmRequest) {
+      if (req.images?.some((image) => image.mediaType === "application/pdf"))
+        throw new Error(
+          "openai-compatible does not support PDF attachments",
+        );
       const base = resolveMessages(req);
       const messages: unknown[] = req.system
         ? [{ role: "system", content: req.system }]

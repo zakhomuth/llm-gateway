@@ -25,6 +25,8 @@ export function createOllamaClient(
         ...(req.system ? [{ role: "system", content: req.system }] : []),
         ...resolveMessages(req),
       ];
+      if (req.images?.some((image) => image.mediaType === "application/pdf"))
+        throw new Error("ollama does not support PDF attachments");
       if (req.images?.length)
         messages[messages.length - 1]!.images = req.images.map((i) => i.data);
       const body = {

@@ -5,7 +5,11 @@ import {
 import { consoleLogger, type Logger } from "../logger.js";
 import { requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
-import { buildBedrockMessages } from "./message-shape.js";
+import {
+  buildBedrockMessages,
+  buildStructuredToolParams,
+  extractAnthropicMessageText,
+} from "./message-shape.js";
 export type BedrockClientLike = {
   send(cmd: InvokeModelCommand): Promise<{ body?: Uint8Array }>;
 };
@@ -19,10 +23,15 @@ export function createBedrockClient(options: {
   return {
     provider: "bedrock",
     async complete(req: LlmRequest) {
+      // Schema requests use the same structured tool as the anthropic driver.
+      // Its system text (incl. the autoTool nudge) is folded into the user
+      // message like any system prompt; no top-level `system` is ever sent.
+      const { system, tools, tool_choice } = buildStructuredToolParams(req);
       const body: Record<string, unknown> = {
         anthropic_version: "bedrock-2023-05-31",
         max_tokens: req.maxTokens,
-        messages: buildBedrockMessages(req),
+        messages: buildBedrockMessages({ ...req, system }),
+        ...(tools ? { tools, tool_choice } : {}),
         ...(req.temperature !== undefined
           ? { temperature: req.temperature }
           : {}),
@@ -43,16 +52,13 @@ export function createBedrockClient(options: {
           }),
         );
         const parsed = JSON.parse(new TextDecoder().decode(response.body)) as {
-          content?: Array<{ type: string; text?: string }>;
+          content?: Array<{ type: string; text?: string; input?: unknown }>;
           usage?: { input_tokens?: number; output_tokens?: number };
           stop_reason?: string;
         };
         if (!Array.isArray(parsed.content))
           throw new Error("Bedrock response has no content array");
-        const text = parsed.content
-          .filter((c) => c.type === "text")
-          .map((c) => c.text ?? "")
-          .join("");
+        const text = extractAnthropicMessageText(parsed.content, req);
         logger.log("[llm-gateway:bedrock] response", {
           operation: req.operation,
           modelArn: options.modelArn,

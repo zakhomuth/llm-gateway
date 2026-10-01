@@ -11,7 +11,7 @@ import { cacheable, validateAgainstSchema } from "./gate.js";
 import { requestKey } from "./key.js";
 import { holderAlive, type InflightLedger } from "./ledger.js";
 import { consoleLogger, type Logger } from "./logger.js";
-import { requestPrompt, validateRequest } from "./request.js";
+import { requestPrompt, resolveMessages, validateRequest } from "./request.js";
 import type { CacheStore } from "./stores/types.js";
 import type {
   LlmClient,
@@ -286,39 +286,98 @@ export class Gateway {
     return deferredShutdown(
       async () => {
         await this.ledger.open(key, { operation: req.operation });
-        let result: LlmProviderResult;
-        let attempt = 0;
-        for (;;) {
-          try {
-            result = await this.provider.complete(req);
-            break;
-          } catch (error) {
-            if (isLlmPausedError(error)) {
-              await this.ledger.close(key);
-              throw error;
-            }
-            attempt++;
-            if (attempt > this.retryBound) {
-              this.logger.error("[llm-gateway] transport retries exhausted", {
+        const callProvider = async (
+          request: LlmRequest,
+        ): Promise<LlmProviderResult> => {
+          let attempt = 0;
+          for (;;) {
+            try {
+              return await this.provider.complete(request);
+            } catch (error) {
+              if (isLlmPausedError(error)) {
+                await this.ledger.close(key);
+                throw error;
+              }
+              attempt++;
+              if (attempt > this.retryBound) {
+                this.logger.error("[llm-gateway] transport retries exhausted", {
+                  operation: req.operation,
+                  key: key.slice(0, 12),
+                  provider: this.provider.provider,
+                  error,
+                });
+                await this.ledger.close(key);
+                throw error;
+              }
+              this.logger.warn("[llm-gateway] retrying transport failure", {
                 operation: req.operation,
                 key: key.slice(0, 12),
                 provider: this.provider.provider,
+                attempt,
                 error,
               });
-              await this.ledger.close(key);
-              throw error;
             }
-            this.logger.warn("[llm-gateway] retrying transport failure", {
+          }
+        };
+        let requestToSend = req;
+        let validationAttempt = 0;
+        let result: LlmProviderResult;
+        let gate: ReturnType<typeof cacheable>;
+        for (;;) {
+          result = await callProvider(requestToSend);
+          await this.recordCost(req, result);
+          gate = cacheable(req, result, this.logger);
+          if (
+            gate.ok ||
+            !req.schema ||
+            validationAttempt >= (req.validationRetries ?? 0)
+          )
+            break;
+          let summary: string;
+          try {
+            const validation = req.schema.safeParse(JSON.parse(result.text));
+            summary = validation.success
+              ? "response failed validation"
+              : validation.error.issues
+                  .map(
+                    (issue) =>
+                      `${issue.path.join(".")}: ${issue.message}`,
+                  )
+                  .join("; ");
+          } catch (error) {
+            summary = "response is not valid JSON";
+            this.logger.error(
+              "[llm-gateway] could not parse response for validation retry",
+              { operation: req.operation, key: key.slice(0, 12), error },
+            );
+          }
+          summary = summary.slice(0, 2000);
+          validationAttempt++;
+          this.logger.warn(
+            "[llm-gateway] validation failed; retrying with correction",
+            {
               operation: req.operation,
               key: key.slice(0, 12),
-              provider: this.provider.provider,
-              attempt,
-              error,
-            });
-          }
+              attempt: validationAttempt,
+              issues: summary,
+            },
+          );
+          requestToSend = {
+            ...req,
+            prompt: undefined,
+            messages: [
+              ...resolveMessages(req),
+              { role: "assistant", content: result.text },
+              {
+                role: "user",
+                content:
+                  "Validation failed: " +
+                  summary +
+                  ". Return a corrected result that satisfies the schema.",
+              },
+            ],
+          };
         }
-        await this.recordCost(req, result);
-        const gate = cacheable(req, result, this.logger);
         if (gate.ok)
           await this.store.put(key, {
             text: result.text,

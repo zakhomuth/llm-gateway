@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   buildAnthropicStyleMessages,
+  buildStructuredToolParams,
   createAnthropicClient,
   createBedrockClient,
   createOllamaClient,
   createOpenAiCompatibleClient,
+  Gateway,
+  InMemoryCacheStore,
+  InMemoryInflightLedger,
 } from "../index.js";
 
 const request = { operation: "shape", prompt: "hello", maxTokens: 99 };
@@ -54,11 +58,84 @@ describe("provider request shapes", () => {
         images: [{ data: "abc", mediaType: "image/png" }],
       })[0]?.content,
     ).toEqual([
-      { type: "text", text: "hello" },
       {
         type: "image",
         source: { type: "base64", media_type: "image/png", data: "abc" },
       },
+      { type: "text", text: "hello" },
+    ]);
+  });
+
+  it("testBuildAnthropicStyleMessagesAttachesDocumentsToFirstUser", () => {
+    const messages = buildAnthropicStyleMessages({
+      operation: "shape",
+      messages: [
+        { role: "assistant", content: "earlier" },
+        { role: "user", content: "inspect" },
+      ],
+      images: [{ data: "pdf-data", mediaType: "application/pdf" }],
+      maxTokens: 1,
+    });
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: "pdf-data",
+        },
+      },
+      { type: "text", text: "inspect" },
+    ]);
+  });
+
+  it("testNonObjectRootSchemaWrapsAndUnwraps", async () => {
+    const schema = z.array(z.object({ a: z.number() }));
+    const client = createAnthropicClient({
+      model: "m",
+      anthropicClient: {
+        messages: {
+          create: async () => ({
+            content: [
+              {
+                type: "tool_use",
+                input: { result: [{ a: 1 }, { a: 2 }] },
+              },
+            ],
+          }),
+        },
+      },
+    });
+    const schemaRequest = { ...request, schema };
+    expect((await client.complete(schemaRequest)).text).toBe(
+      JSON.stringify([{ a: 1 }, { a: 2 }]),
+    );
+    expect(
+      (buildStructuredToolParams(schemaRequest).tools?.[0] as any).input_schema,
+    ).toEqual({
+      type: "object",
+      properties: {
+        result: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { a: { type: "number" } },
+            additionalProperties: false,
+            required: ["a"],
+          },
+        },
+      },
+      required: ["result"],
+    });
+    const gateway = new Gateway({
+      provider: client,
+      model: "m",
+      store: new InMemoryCacheStore(),
+      ledger: new InMemoryInflightLedger(),
+    });
+    expect((await gateway.complete(schemaRequest)).parsed).toEqual([
+      { a: 1 },
+      { a: 2 },
     ]);
   });
 

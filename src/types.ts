@@ -9,6 +9,7 @@ export interface LlmImage {
   data: string;
   mediaType: string;
 }
+export type LlmAttachment = LlmImage;
 export interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
@@ -27,6 +28,7 @@ export interface LlmRequest<TSchema = unknown> {
   fresh?: boolean;
   batchable?: boolean;
   autoTool?: boolean;
+  validationRetries?: number;
 }
 export interface LlmResult<TParsed = unknown> {
   text: string;

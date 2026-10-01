@@ -62,7 +62,7 @@ export function createAnthropicClient(
       });
       try {
         const response = await getClient().messages.create(body);
-        const text = extractAnthropicMessageText(response.content);
+        const text = extractAnthropicMessageText(response.content, req);
         logger.log("[llm-gateway:anthropic] response", {
           operation: req.operation,
           model,
