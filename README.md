@@ -14,8 +14,8 @@ const result = await gateway.complete({ operation: 'summarize', prompt: 'Summari
 | `<P>_LLM` | `paused`, `dry-run`, `bedrock`, `anthropic`, `ollama`, or `openai-compatible` | `paused` |
 | `<P>_LLM_MODEL` | Provider model identifier (required for `openai-compatible`; bedrock uses `<P>_BEDROCK_MODEL_ARN`) | `claude-sonnet-5-5` (anthropic), `llama3` (ollama) |
 | `<P>_BEDROCK_MODEL_ARN` | Bedrock inference profile ARN | required for Bedrock |
-| `<P>_LLM_BASE_URL` | OpenAI-compatible base URL | required in that mode |
-| `<P>_LLM_API_KEY` | OpenAI-compatible bearer token | required in that mode |
+| `<P>_LLM_BASE_URL` | OpenAI-compatible base URL; Ollama base URL | required for openai-compatible; Ollama default `http://localhost:11434` |
+| `<P>_LLM_API_KEY` | OpenAI-compatible bearer token; Anthropic key | required for openai-compatible; Anthropic falls back to `ANTHROPIC_API_KEY` |
 | `<P>_LLM_CACHE` | `on`, `off`, or `replay-only` | `on` |
 | `<P>_LLM_DAILY_USD` | Daily USD cap | `10` |
 | `<P>_LLM_PRICE_PER_MTOK` | `<input>/<output>` USD per million tokens, e.g. `3/15`; overrides the built-in table | built-in Claude table; ollama, paused and dry-run cost `0` |

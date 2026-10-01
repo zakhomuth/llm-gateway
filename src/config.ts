@@ -29,6 +29,8 @@ export interface GatewayEnvDeps {
   anthropicClient?: unknown;
   bedrockClient?: unknown;
   dryRunFixturesDir?: string;
+  /** Extra attempts after a transport failure (Gateway default 2; 0 = none). */
+  transportRetryBound?: number;
   now?: () => Date;
 }
 export function createGatewayFromEnv(
@@ -93,7 +95,7 @@ export function createGatewayFromEnv(
   } else if (mode === "anthropic") {
     effectiveModel = model || DEFAULT_ANTHROPIC_MODEL;
     provider = createAnthropicClient({
-      apiKey: env.ANTHROPIC_API_KEY,
+      apiKey: get("LLM_API_KEY") || env.ANTHROPIC_API_KEY,
       model: model || undefined,
       anthropicClient: deps.anthropicClient as AnthropicClientLike | undefined,
       logger,
@@ -102,6 +104,7 @@ export function createGatewayFromEnv(
     effectiveModel = model || DEFAULT_OLLAMA_MODEL;
     price ??= FREE_PRICE;
     provider = createOllamaClient({
+      baseUrl: get("LLM_BASE_URL") || undefined,
       model: model || undefined,
       fetchImpl: deps.fetchImpl,
       logger,
@@ -145,5 +148,8 @@ export function createGatewayFromEnv(
     forceRefresh: get("LLM_REFRESH") === "1",
     logger,
     now: deps.now,
+    ...(deps.transportRetryBound !== undefined
+      ? { transportRetryBound: deps.transportRetryBound }
+      : {}),
   });
 }

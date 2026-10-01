@@ -257,6 +257,11 @@ export class Gateway {
       stopReason: r.stopReason,
     };
   }
+  /** Name of the active provider ("paused", "dry-run", "bedrock", …). */
+  get providerName(): string {
+    return this.provider.provider;
+  }
+
   async complete(input: LlmRequest): Promise<LlmResult> {
     const req = this.prepared(input);
     const key = this.keyOf(req);
