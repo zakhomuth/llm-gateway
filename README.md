@@ -9,12 +9,18 @@ const result = await gateway.complete({ operation: 'summarize', prompt: 'Summari
 
 ## Environment
 
+The default engine is a local model: with `<P>_LLM` unset the gateway calls Ollama at
+`http://localhost:11434` with `qwen2.5vl:7b` (`ollama pull qwen2.5vl:7b`). To use a hosted model instead, set
+`<P>_LLM=anthropic` or `<P>_LLM=openai-compatible` with the model and key of your choice. The gateway never falls back
+from the local engine to a paid API on its own. Set `<P>_LLM=paused` to disable model calls.
+
 | Variable | Meaning | Default |
 |---|---|---|
-| `<P>_LLM` | `paused`, `dry-run`, `bedrock`, `anthropic`, `ollama`, or `openai-compatible` | `paused` |
-| `<P>_LLM_MODEL` | Provider model identifier (required for `openai-compatible`; bedrock uses `<P>_BEDROCK_MODEL_ARN`) | `claude-sonnet-5-5` (anthropic), `llama3` (ollama) |
+| `<P>_LLM` | `paused`, `dry-run`, `bedrock`, `anthropic`, `ollama`, or `openai-compatible` | `ollama` (local) |
+| `<P>_LLM_MODEL` | Provider model identifier (required for `openai-compatible`; bedrock uses `<P>_BEDROCK_MODEL_ARN`) | `claude-sonnet-5-5` (anthropic), `qwen2.5vl:7b` (ollama) |
 | `<P>_BEDROCK_MODEL_ARN` | Bedrock inference profile ARN | required for Bedrock |
 | `<P>_LLM_BASE_URL` | OpenAI-compatible base URL; Ollama base URL | required for openai-compatible; Ollama default `http://localhost:11434` |
+| `<P>_OLLAMA_NUM_CTX` | Ollama context window in tokens, sent as `options.num_ctx` on each call (positive integer) | unset (server default) |
 | `<P>_LLM_API_KEY` | OpenAI-compatible bearer token; Anthropic key | required for openai-compatible; Anthropic falls back to `ANTHROPIC_API_KEY` |
 | `<P>_LLM_CACHE` | `on`, `off`, or `replay-only` | `on` |
 | `<P>_LLM_DAILY_USD` | Daily USD cap | `10` |

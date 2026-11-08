@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.3.0
+
+- **Default engine is now local.** With `<P>_LLM` unset the gateway uses Ollama (`http://localhost:11434`) instead of
+  `paused`. Deployments that relied on the old default must set `<P>_LLM=paused` (or their engine) explicitly.
+- Default Ollama model is `qwen2.5vl:7b` (reads images; reliable JSON) instead of `llama3`.
+- Ollama accepts a context window: `createOllamaClient({ numCtx })` or `<P>_OLLAMA_NUM_CTX` sends `options.num_ctx` on
+  `/api/chat`. Unset, the request body is unchanged.
+- A hosted model is an explicit choice (`anthropic` or `openai-compatible`); there is no automatic fallback to a paid API.
+
 ## 0.2.2
 
 - Ollama reads its base URL from `<P>_LLM_BASE_URL` (default `http://localhost:11434`), so docker can reach a host Ollama.

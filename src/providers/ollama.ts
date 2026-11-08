@@ -2,11 +2,13 @@ import { consoleLogger, logSafe, type Logger } from "../logger.js";
 import { resolveMessages, requestPrompt } from "../request.js";
 import type { LlmClient, LlmRequest } from "../types.js";
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
-export const DEFAULT_OLLAMA_MODEL = "llama3";
+export const DEFAULT_OLLAMA_MODEL = "qwen2.5vl:7b";
 export function createOllamaClient(
   options: {
     baseUrl?: string;
     model?: string;
+    /** Context window in tokens, sent as options.num_ctx; unset leaves the server default. */
+    numCtx?: number;
     fetchImpl?: FetchLike;
     logger?: Logger;
   } = {},
@@ -38,6 +40,7 @@ export function createOllamaClient(
           ...(req.temperature !== undefined
             ? { temperature: req.temperature }
             : {}),
+          ...(options.numCtx !== undefined ? { num_ctx: options.numCtx } : {}),
         },
       };
       logger.log("[llm-gateway:ollama] request", {

@@ -11,12 +11,12 @@ import {
 } from "../index.js";
 const req = { operation: "summarize", prompt: "P", system: "S", maxTokens: 10 };
 describe("providers and config", () => {
-  it("paused client and default env mode throw", async () => {
+  it("paused client and explicit paused env mode throw", async () => {
     await expect(createPausedClient().complete(req)).rejects.toBeInstanceOf(
       LlmPausedError,
     );
     await expect(
-      createGatewayFromEnv("X", {}).complete(req),
+      createGatewayFromEnv("X", { X_LLM: "paused" }).complete(req),
     ).rejects.toBeInstanceOf(LlmPausedError);
   });
   it("dry run serves three fixtures and logs missing", async () => {

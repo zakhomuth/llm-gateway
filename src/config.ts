@@ -40,7 +40,7 @@ export function createGatewayFromEnv(
 ): Gateway {
   const p = prefix.toUpperCase();
   const get = (suffix: string) => env[`${p}_${suffix}`]?.trim();
-  const mode = get("LLM") || "paused";
+  const mode = get("LLM") || "ollama";
   const modes = [
     "paused",
     "dry-run",
@@ -103,9 +103,14 @@ export function createGatewayFromEnv(
   } else if (mode === "ollama") {
     effectiveModel = model || DEFAULT_OLLAMA_MODEL;
     price ??= FREE_PRICE;
+    const numCtxRaw = get("OLLAMA_NUM_CTX");
+    const numCtx = numCtxRaw ? Number(numCtxRaw) : undefined;
+    if (numCtx !== undefined && (!Number.isInteger(numCtx) || numCtx <= 0))
+      throw new Error(`${p}_OLLAMA_NUM_CTX must be a positive integer`);
     provider = createOllamaClient({
       baseUrl: get("LLM_BASE_URL") || undefined,
       model: model || undefined,
+      numCtx,
       fetchImpl: deps.fetchImpl,
       logger,
     });

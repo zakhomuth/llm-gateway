@@ -268,4 +268,41 @@ describe("provider request shapes", () => {
     expect(body.messages[0]).toEqual({ role: "system", content: "system" });
     expect(body.messages[1].images).toEqual(["raw-base64"]);
   });
+
+  it("testOllamaNumCtxSentAsOption", async () => {
+    let body: any;
+    const client = createOllamaClient({
+      numCtx: 16384,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init.body));
+        return response('{"message":{"content":"ok"}}');
+      },
+    });
+    await client.complete({ ...request, temperature: 0 });
+    expect(body.options).toEqual({
+      num_predict: 99,
+      temperature: 0,
+      num_ctx: 16384,
+    });
+  });
+
+  it("testOllamaNumCtxUnsetLeavesBodyUnchanged", async () => {
+    let raw = "";
+    const client = createOllamaClient({
+      model: "m",
+      fetchImpl: async (_url, init) => {
+        raw = String(init.body);
+        return response('{"message":{"content":"ok"}}');
+      },
+    });
+    await client.complete(request);
+    expect(raw).toBe(
+      JSON.stringify({
+        model: "m",
+        messages: [{ role: "user", content: "hello" }],
+        stream: false,
+        options: { num_predict: 99 },
+      }),
+    );
+  });
 });
